@@ -1,0 +1,16 @@
+[package]
+name = "march"
+version = "0.1.0"
+authors = ["dummyc0m"]
+edition = "2018"
+
+[dependencies.amethyst]
+version = "0.13.2"
+features = ["vulkan", "nightly"]
+
+[dependencies]
+simdnoise = "3.1.4"
+getset = "0.0.9"
+ndarray = "0.13.0"
+num-traits = "0.2.10"
+ron = "0.5.1"
