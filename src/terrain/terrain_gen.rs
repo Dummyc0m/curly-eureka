@@ -40,7 +40,7 @@ impl TerrainGenerator {
       .with_octaves(4)
       .generate()
       ;
-    let data = data.into_iter().map(|v| v * 20.0).collect::<Vec<_>>();
+    let data = data.into_iter().map(|v| v * 25.0).collect::<Vec<_>>();
     let height_map = Array2::from_shape_vec((WIDTH, DEPTH), data).unwrap();
     let data = Array3::from_shape_fn((WIDTH, HEIGHT, DEPTH), |(x, y, z)| {
       let height: f32 = *height_map.get((x, z)).unwrap();

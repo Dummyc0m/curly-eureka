@@ -76,17 +76,9 @@ fn initialize_camera(world: &mut World) {
   auto_fov.set_base_fovx(std::f32::consts::FRAC_PI_3);
   auto_fov.set_base_aspect_ratio(1, 1);
 
-  let light1: Light = PointLight {
-    intensity: 10.0,
-    color: Srgb::new(0.8, 0.8, 0.0),
-    ..PointLight::default()
-  }
-    .into();
-
   let camera = world
     .create_entity()
     .with(Camera::standard_3d(16.0, 9.0))
-    .with(light1)
     .with(auto_fov)
     .with(transform)
     .with(FlyControlTag)
@@ -100,8 +92,9 @@ fn initialize_camera(world: &mut World) {
 
 fn initialize_directional_light(world: &mut World) {
   let light = DirectionalLight {
-    intensity: 5.0,
-    ..DirectionalLight::default()
+    intensity: 0.7,
+    direction: Vector3::new(-0.1, -1.0, -0.1),
+    color: Srgb::new(1.0, 1.0, 1.0),
   };
   let light: Light = light.into();
 
@@ -152,7 +145,7 @@ fn initialize_triangle(world: &mut World) {
 }
 
 fn mk_material(world: &mut World) -> Handle<Material> {
-  let color = load_from_linear_rgba(LinSrgba::new(1.0, 0.0, 0.0, 1.0));
+  let color = load_from_linear_rgba(LinSrgba::new(1.0, 0.0, 0.5, 1.0));
   let texture_handle = world.read_resource::<Loader>().load_from_data(color.into(), (), &world.read_resource());
 
   let default_mat = world.read_resource::<MaterialDefaults>().0.clone();

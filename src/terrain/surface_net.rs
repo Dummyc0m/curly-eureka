@@ -3,7 +3,7 @@ use amethyst::renderer::{
   types::{Mesh, MeshData},
   shape::Shape,
   rendy::{
-    mesh::{ MeshBuilder, Position, Color, Indices, TexCoord },
+    mesh::{ MeshBuilder, Position, Color, Indices, TexCoord, PosTex },
     util::types::vertex::PosColor,
   },
 };
@@ -34,6 +34,8 @@ impl Default for SurfaceNetCube {
     }
   }
 }
+
+type VecTex = (Vector3<f32>, TexCoord);
 
 pub struct SurfaceNet {
   voxel_corner_offsets: [Vector3<usize>; 8],
@@ -195,16 +197,17 @@ impl SurfaceNet {
   }
 
   pub fn mk_mesh(&self, cubes: Array3<SurfaceNetCube>) -> MeshData {
-    let mut vertices = Vec::<Vector3<f32>>::new();
-    let mut triangles = Vec::<u16>::new();
+    let mut vertices = Vec::<Position>::new();
     let mut tex_coords = Vec::<TexCoord>::new();
+
+    let mut triangles = Vec::<u16>::new();
 
     let (width, height, depth) = cubes.dim();
     let mut pos = [0; 3];
     let mut r = [1, width as i32 + 1, (width as i32 + 1) * (height as i32 + 1)];
     let mut buf_no = 1;
 
-    let mut vertex_buffer = vec![0_usize; r[2] as usize * 2];
+    let mut vertex_buffer: Vec<VecTex> = vec![(Vector3::zero(), TexCoord([1.0, 0.0])); r[2] as usize * 2];
 
     while pos[2] < depth - 1 {
       let mut buf_idx = 1 + (width + 1) * ( 1 + buf_no * (height + 1));
@@ -221,10 +224,10 @@ impl SurfaceNet {
             continue
           }
 
-          vertex_buffer[buf_idx] = vertices.len();
-          vertices.push(position);
-          // TODO add colors
-          tex_coords.push(TexCoord([1.0, 0.0]));
+          vertex_buffer[buf_idx] = (
+            position,
+            TexCoord([1.0, 0.0])
+          );
 
           let edge_mask = self.intersection_table[corner_mask as usize];
           // add faces
@@ -249,12 +252,12 @@ impl SurfaceNet {
             if (corner_mask & 1) != 0 {
               Self::add_quad(vertex_buffer[buf_idx], vertex_buffer[(buf_idx as i32 - du) as usize],
                              vertex_buffer[(buf_idx as i32 - dv - du) as usize],
-                             vertex_buffer[(buf_idx as i32 - dv) as usize], &vertices, &mut triangles,
+                             vertex_buffer[(buf_idx as i32 - dv) as usize], &mut vertices, &mut tex_coords, &mut triangles,
               );
             } else {
               Self::add_quad(vertex_buffer[buf_idx], vertex_buffer[(buf_idx as i32 - dv) as usize],
                              vertex_buffer[(buf_idx as i32 - dv - du) as usize],
-                             vertex_buffer[(buf_idx as i32 - du) as usize], &vertices, &mut triangles,
+                             vertex_buffer[(buf_idx as i32 - du) as usize], &mut vertices, &mut tex_coords, &mut triangles,
               );
             }
           }
@@ -286,40 +289,46 @@ impl SurfaceNet {
 //    let mut file = File::create("surface_net.triangles.ron").unwrap();
 //    write!(file, "{}", ron::ser::to_string_pretty(&triangles, PrettyConfig::default()).unwrap()).unwrap();
 
-    let positions = vertices.into_iter().map(|v| Position(v.into())).collect::<Vec<_>>();
-    let normals = calculate_normals(&positions, &triangles);
+    let normals = calculate_normals(&vertices, &triangles);
 
     MeshData(
       MeshBuilder::new()
-        .with_vertices(positions)
+        .with_vertices(vertices)
         .with_vertices(normals)
         .with_vertices(tex_coords)
         .with_indices(triangles)
     )
   }
 
-  fn add_quad(a: usize, b: usize, c: usize, d: usize,
-              vertices: &[Vector3<f32>], triangles: &mut Vec<u16>) {
-    let vec_a = vertices[a];
-    let vec_b = vertices[b];
-    let vec_c = vertices[c];
-    let vec_d = vertices[d];
+  fn push_triangle(vectex: VecTex, vertices: &mut Vec<Position>, tex_coords: &mut Vec<TexCoord>, triangles: &mut Vec<u16>) {
+    triangles.push(vertices.len() as u16);
+    vertices.push(Position(vectex.0.into()));
+    tex_coords.push(vectex.1);
+  }
+
+  fn add_quad(a: VecTex, b: VecTex, c: VecTex, d: VecTex,
+              vertices: &mut Vec<Position>, tex_coords: &mut Vec<TexCoord>, triangles: &mut Vec<u16>) {
+    let vec_a: Vector3<f32> = a.0;
+    let vec_b: Vector3<f32> = b.0;
+    let vec_c: Vector3<f32> = c.0;
+    let vec_d: Vector3<f32> = d.0;
+
     if (vec_a - vec_c).norm_squared() >= (vec_b - vec_d).norm_squared() {
-      triangles.push(a as u16);
-      triangles.push(b as u16);
-      triangles.push(d as u16);
+      Self::push_triangle(a, vertices, tex_coords, triangles);
+      Self::push_triangle(b, vertices, tex_coords, triangles);
+      Self::push_triangle(d, vertices, tex_coords, triangles);
 
-      triangles.push(d as u16);
-      triangles.push(b as u16);
-      triangles.push(c as u16);
+      Self::push_triangle(d, vertices, tex_coords, triangles);
+      Self::push_triangle(b, vertices, tex_coords, triangles);
+      Self::push_triangle(c, vertices, tex_coords, triangles);
     } else {
-      triangles.push(a as u16);
-      triangles.push(b as u16);
-      triangles.push(c as u16);
+      Self::push_triangle(a, vertices, tex_coords, triangles);
+      Self::push_triangle(b, vertices, tex_coords, triangles);
+      Self::push_triangle(c, vertices, tex_coords, triangles);
 
-      triangles.push(a as u16);
-      triangles.push(c as u16);
-      triangles.push(d as u16);
+      Self::push_triangle(a, vertices, tex_coords, triangles);
+      Self::push_triangle(c, vertices, tex_coords, triangles);
+      Self::push_triangle(d, vertices, tex_coords, triangles);
     }
   }
 }
