@@ -1,0 +1,10 @@
+(
+    seed: 25565,
+    lacunarity: 0.5,
+    freq: 0.04,
+    gain: 4.0,
+    octaves: 4,
+
+    scaling: 25.0,
+    cutoff: false,
+)

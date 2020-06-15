@@ -6,12 +6,13 @@ use amethyst::{
   },
   input::{ is_close_requested, is_key_down },
   renderer::{
+    resources::AmbientColor,
     types::{Mesh, MeshData},
     light::{Light, DirectionalLight, PointLight},
     rendy::mesh::{ MeshBuilder, Position, Color, TexCoord, Indices},
     rendy::util::types::vertex::{PosColor, PosTex},
     debug_drawing::DebugLines,
-    palette::rgb::{ LinSrgba, Srgb },
+    palette::{ LinSrgba, Srgb, Srgba },
     visibility::BoundingSphere,
     MaterialDefaults,
     ActiveCamera,
@@ -27,8 +28,9 @@ use amethyst::{
   },
 };
 
-use crate::terrain::terrain_gen::TerrainGenerator;
+use crate::terrain::terrain_gen::{TerrainGenerator, WIDTH, DEPTH};
 use crate::terrain::surface_net::SurfaceNet;
+use crate::config::generator::GeneratorConfig;
 use std::fs::File;
 use std::io::Write;
 use ron::ser::PrettyConfig;
@@ -41,6 +43,7 @@ impl SimpleState for March {
   fn on_start(&mut self, data: StateData<GameData>) {
     initialize_triangle(data.world);
     initialize_terrain(data.world);
+    initialize_ambient_light(data.world);
     initialize_directional_light(data.world);
     initialize_camera(data.world);
   }
@@ -70,7 +73,7 @@ impl SimpleState for March {
 
 fn initialize_camera(world: &mut World) {
   let mut transform = Transform::default();
-  transform.set_translation_xyz(0.0, 0.0, 0.0);
+  transform.set_translation_xyz(0.0, 80.0, 0.0);
 
   let mut auto_fov = AutoFov::default();
   auto_fov.set_base_fovx(std::f32::consts::FRAC_PI_3);
@@ -93,7 +96,7 @@ fn initialize_camera(world: &mut World) {
 fn initialize_directional_light(world: &mut World) {
   let light = DirectionalLight {
     intensity: 0.7,
-    direction: Vector3::new(-0.1, -1.0, -0.1),
+    direction: Vector3::new(-0.3, -1.0, -0.3),
     color: Srgb::new(1.0, 1.0, 1.0),
   };
   let light: Light = light.into();
@@ -105,6 +108,12 @@ fn initialize_directional_light(world: &mut World) {
     .with(light_transform)
     .build()
   ;
+}
+
+fn initialize_ambient_light(world: &mut World) {
+  world.exec(|mut color: amethyst::ecs::prelude::Write<'_, AmbientColor>| {
+    color.0 = Srgba::new(0.2, 0.2, 0.2, 1.0);
+  })
 }
 
 fn initialize_triangle(world: &mut World) {
@@ -160,10 +169,20 @@ fn mk_material(world: &mut World) -> Handle<Material> {
 
 fn initialize_terrain(world: &mut World) {
   // let default_mat = world.read_resource::<MaterialDefaults>().0.clone();
+  let gen_config = (&*world.read_resource::<GeneratorConfig>()).clone();
   println!("generating terrain");
-  let terrain_gen = TerrainGenerator::new(25565);
-  println!("generating chunk");
-  let chunk = terrain_gen.generate_chunk(0, 0);
+  let terrain_gen = TerrainGenerator::new(gen_config);
+  let mat_handle = mk_material(world);
+  for i in -5..5 {
+    for j in -5..5 {
+      initialize_chunk(world, &terrain_gen, mat_handle.clone(), (i, j))
+    }
+  }
+}
+
+fn initialize_chunk(world: &mut World, terrain_gen: &TerrainGenerator, mat_handle: Handle<Material>, (x, z): (i32, i32)) {
+  println!("generating chunk ({}, {})", x, z);
+  let chunk = terrain_gen.generate_chunk(x, z);
   println!("generating surface net");
   let surface_net = SurfaceNet::new();
   println!("generating surface net cubes");
@@ -179,10 +198,7 @@ fn initialize_terrain(world: &mut World) {
     mesh_handle
   };
 
-  let mut transform = Transform::default();
-  transform.set_translation_y(-120.0);
-
-  let mat_handle = mk_material(world);
+  let mut transform = Transform::from(Vector3::new((x * WIDTH as i32) as f32, 0.0, (z * DEPTH as i32) as f32));
 
   println!("creating entity");
   world.create_entity()
@@ -190,7 +206,5 @@ fn initialize_terrain(world: &mut World) {
     .with(BoundingSphere::origin(256.0))
     .with(mat_handle)
     .with(transform)
-    .build()
-  ;
+    .build();
 }
-

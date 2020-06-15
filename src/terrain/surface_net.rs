@@ -131,10 +131,10 @@ impl SurfaceNet {
   }
 
   pub fn mk_cubes(&self, chunk: &Chunk) -> Array3<SurfaceNetCube> {
-    let mut cubes = Array3::from_elem((WIDTH, HEIGHT, DEPTH), SurfaceNetCube::default());
-    for x in 0..(WIDTH - 1) {
-      for y in 0..(HEIGHT - 1) {
-        for z in 0..(DEPTH - 1) {
+    let mut cubes = Array3::from_elem((WIDTH + 2, HEIGHT + 2, DEPTH + 2), SurfaceNetCube::default());
+    for x in 0..WIDTH + 2 {
+      for y in 0..HEIGHT + 2 {
+        for z in 0..DEPTH + 2 {
           let mut sample = [0f32; 8];
           for i in 0..8 {
             let offset = self.voxel_corner_offsets[i];
@@ -182,7 +182,14 @@ impl SurfaceNet {
       let e1 = self.cube_edges[(i << 1) + 1];
       let g0 = sample[e0 as usize];
       let g1 = sample[e1 as usize];
-      let t = (-g0) / (g1 - g0);
+      let t = {
+        let t = g0 - g1;
+        if t.abs() > 1e-6 {
+          g0 / t
+        } else {
+          continue
+        }
+      };
 
       vert_pos += (self.voxel_corner_offsets_f32[e0 as usize]).lerp(&(self.voxel_corner_offsets_f32[e1 as usize]), t);
     }
@@ -313,7 +320,7 @@ impl SurfaceNet {
     let vec_c: Vector3<f32> = c.0;
     let vec_d: Vector3<f32> = d.0;
 
-    if (vec_a - vec_c).norm_squared() >= (vec_b - vec_d).norm_squared() {
+    if (vec_a - vec_c).norm_squared() > (vec_b - vec_d).norm_squared() {
       Self::push_triangle(a, vertices, tex_coords, triangles);
       Self::push_triangle(b, vertices, tex_coords, triangles);
       Self::push_triangle(d, vertices, tex_coords, triangles);

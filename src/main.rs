@@ -1,5 +1,6 @@
+use std::path::Path;
 use amethyst::{
-  core::transform::TransformBundle,
+  core::{transform::TransformBundle, frame_limiter::FrameRateLimitStrategy},
   prelude::*,
   renderer::{
     plugins::{RenderShaded3D, RenderPbr3D, RenderFlat3D, RenderToWindow, RenderDebugLines, RenderSkybox},
@@ -15,14 +16,17 @@ use amethyst::{
     fps_counter::FpsCounterBundle,
   },
   controls::FlyControlBundle,
+  config::Config,
 };
 
 use amethyst::ui::{RenderUi, UiBundle};
 use crate::march::March;
+use crate::config::generator::GeneratorConfig;
 
 mod march;
 mod terrain;
 mod util;
+mod config;
 
 fn main() -> amethyst::Result<()> {
   amethyst::start_logger(Default::default());
@@ -33,6 +37,9 @@ fn main() -> amethyst::Result<()> {
   let bindings_path = app_root.join("config").join("bindings.ron");
   let input_bundle = InputBundle::<StringBindings>::new()
     .with_bindings_from_file(bindings_path)?;
+
+  let generator_path = app_root.join("config").join("generator.ron");
+  let generator_config = GeneratorConfig::load(&generator_path)?;
 
   let game_data = GameDataBuilder::default()
     .with(AutoFovSystem::default(), "auto_fov", &[])
@@ -54,7 +61,7 @@ fn main() -> amethyst::Result<()> {
     .with_bundle(UiBundle::<StringBindings>::new())?
     .with_bundle(
       RenderingBundle::<DefaultBackend>::new()
-        .with_plugin(RenderToWindow::from_config_path(display_config_path))
+        .with_plugin(RenderToWindow::from_config_path(display_config_path)?)
         .with_plugin(RenderShaded3D::default())
         .with_plugin(RenderDebugLines::default())
         .with_plugin(RenderSkybox::with_colors(
@@ -64,7 +71,10 @@ fn main() -> amethyst::Result<()> {
     )?
     ;
   let assets_dir = app_root.join("assets");
-  let mut game = Application::new(assets_dir, March::default(), game_data)?;
+  let mut game : Application<_> = ApplicationBuilder::new(assets_dir, March::default())
+    ?.with_resource(generator_config)
+    .with_frame_limit(FrameRateLimitStrategy::Yield, 60)
+    .build(game_data)?;
   game.run();
   Ok(())
 }
