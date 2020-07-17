@@ -1,3 +1,5 @@
+#![feature(type_ascription)]
+
 use std::path::Path;
 use amethyst::{
   core::{transform::TransformBundle, frame_limiter::FrameRateLimitStrategy},
